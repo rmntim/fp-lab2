@@ -1,0 +1,6 @@
+# dune init proj labwork2 Labwork2
+# OCAMLPARAM: unset
+# Shared cache: enabled-except-user-rules
+# Shared cache location: /Users/roman/.cache/dune/db
+# Workspace root: /Users/roman/Programming/ITMO/Semester5/FP/Labwork2
+# Auto-detected concurrency: 8
