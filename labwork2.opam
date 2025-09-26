@@ -11,6 +11,9 @@ depends: [
   "dune" {>= "3.20"}
   "ocaml"
   "zanuda" {with-dev-setup}
+  "alcotest" {with-test}
+  "qcheck" {with-test}
+  "qcheck-alcotest" {with-test}
   "odoc" {with-doc}
 ]
 build: [

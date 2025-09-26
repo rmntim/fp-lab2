@@ -19,4 +19,7 @@
  (description "Functional Programming Labwork 2")
  (depends
    ocaml
-   (zanuda :with-dev-setup)))
+   (zanuda :with-dev-setup)
+   (alcotest :with-test)
+   (qcheck :with-test)
+   (qcheck-alcotest :with-test)))
