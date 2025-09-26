@@ -131,8 +131,7 @@ module Make (Ord : OrderedType) : S with type key = Ord.t = struct
         let left', min_key, min_value = remove_min left in
         (balance (create left' key value right), min_key, min_value)
 
-  let rec remove key tree =
-    match tree with
+  let rec remove key = function
     | Empty -> Empty
     | Node { key = k; value = v; left; right; _ } ->
         let cmp = Ord.compare key k in
@@ -198,8 +197,8 @@ module Make (Ord : OrderedType) : S with type key = Ord.t = struct
   let of_list entries =
     List.fold_left (fun acc (key, value) -> insert key value acc) empty entries
 
-  let minimum tree = minimum_opt tree
-  let maximum tree = maximum_opt tree
+  let minimum = minimum_opt
+  let maximum = maximum_opt
 
   let rec push_left stack = function
     | Empty -> stack
