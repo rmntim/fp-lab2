@@ -17,4 +17,6 @@
  (name labwork2)
  (synopsis "Functional Programming Labwork 2")
  (description "Functional Programming Labwork 2")
- (depends ocaml))
+ (depends
+   ocaml
+   (zanuda :with-dev-setup)))
