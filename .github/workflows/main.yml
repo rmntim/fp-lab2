@@ -1,0 +1,22 @@
+name: Builds, tests & co
+
+on:
+  - push
+  - pull_request
+
+permissions: read-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tree
+        uses: actions/checkout@v5
+      - name: Set-up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 4
+      - run: opam install . --deps-only --with-test --with-dev-setup
+      - run: opam exec -- dune build @check
+      - run: opam exec -- dune runtest
+      - run: opam exec -- zanuda -dir .
