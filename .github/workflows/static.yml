@@ -26,7 +26,7 @@ jobs:
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: 4
-      - run: opam install . --deps-only --with-test
+      - run: opam install . --deps-only --with-test --with-dev-setup
       - run: opam exec -- dune runtest --instrument-with bisect_ppx
       - run: opam exec -- bisect-ppx-report html
       - name: Upload artifact

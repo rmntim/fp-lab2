@@ -22,4 +22,5 @@
    (zanuda (and (= 1.1.0) :with-dev-setup))
    (alcotest :with-test)
    (qcheck :with-test)
-   (qcheck-alcotest :with-test)))
+   (qcheck-alcotest :with-test)
+   (bisect_ppx :with-dev-setup)))

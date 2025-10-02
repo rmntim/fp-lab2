@@ -1,2 +1,3 @@
 (library
- (name labwork2))
+ (name labwork2)
+ (instrumentation (backend bisect_ppx)))
