@@ -1,5 +1,3 @@
-(** AVL-based immutable dictionary. *)
-
 module type OrderedType = sig
   type t
 
@@ -8,6 +6,8 @@ end
 
 module type S = sig
   type key
+  type empty
+  type nonempty
   type +'a t
 
   val empty : 'a t

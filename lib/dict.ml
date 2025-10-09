@@ -6,6 +6,8 @@ end
 
 module type S = sig
   type key
+  type empty
+  type nonempty
   type +'a t
 
   val empty : 'a t
@@ -32,32 +34,40 @@ end
 
 module Make (Ord : OrderedType) : S with type key = Ord.t = struct
   type key = Ord.t
+  type empty
+  type nonempty
 
-  type +'a tree =
-    | Empty
-    | Node of {
+  type (+'a, _) tree =
+    | Empty : ('a, empty) tree
+    | Node : {
         key : key;
         value : 'a;
         height : int;
-        left : 'a tree;
-        right : 'a tree;
+        left : ('a, 'l) tree;
+        right : ('a, 'r) tree;
       }
+        -> ('a, nonempty) tree
 
-  type +'a t = 'a tree
+  type +'a t = Ex : ('a, _) tree -> 'a t
 
-  let empty = Empty
-  let is_empty = function Empty -> true | Node _ -> false
-  let height = function Empty -> 0 | Node { height; _ } -> height
+  let empty = Ex Empty
+  let is_empty (Ex t) = match t with Empty -> true | Node _ -> false
 
-  let create left key value right =
+  let height : type a e. (a, e) tree -> int = function
+    | Empty -> 0
+    | Node { height; _ } -> height
+
+  let create : type a l r.
+      (a, l) tree -> key -> a -> (a, r) tree -> (a, nonempty) tree =
+   fun left key value right ->
     let height = 1 + Stdlib.max (height left) (height right) in
     Node { key; value; height; left; right }
 
-  let balance_factor = function
+  let balance_factor : type a e. (a, e) tree -> int = function
     | Empty -> 0
     | Node { left; right; _ } -> height left - height right
 
-  let rotate_left = function
+  let rotate_left : type a e. (a, e) tree -> (a, e) tree = function
     | Node
         {
           key = kx;
@@ -69,7 +79,7 @@ module Make (Ord : OrderedType) : S with type key = Ord.t = struct
         create (create ax kx vx by) ky vy cy
     | tree -> tree
 
-  let rotate_right = function
+  let rotate_right : type a e. (a, e) tree -> (a, e) tree = function
     | Node
         {
           key = ky;
@@ -81,7 +91,7 @@ module Make (Ord : OrderedType) : S with type key = Ord.t = struct
         create ax kx vx (create bx ky vy cy)
     | tree -> tree
 
-  let balance = function
+  let balance : type a e. (a, e) tree -> (a, e) tree = function
     | Empty -> Empty
     | Node { left; right; key; value; _ } ->
         let bf = height left - height right in
@@ -101,81 +111,122 @@ module Make (Ord : OrderedType) : S with type key = Ord.t = struct
           rotate_left (create left key value right')
         else create left key value right
 
-  let singleton key value = create Empty key value Empty
+  let singleton key value = Ex (create Empty key value Empty)
 
-  let rec insert key value = function
-    | Empty -> singleton key value
-    | Node ({ key = k; value = v; left; right; _ } as _node) ->
+  let rec insert_aux : type a e. key -> a -> (a, e) tree -> (a, nonempty) tree =
+   fun key value -> function
+    | Empty -> create Empty key value Empty
+    | Node { key = k; value = v; left; right; _ } ->
         let cmp = Ord.compare key k in
         if cmp = 0 then create left key value right
-        else if cmp < 0 then balance (create (insert key value left) k v right)
-        else balance (create left k v (insert key value right))
+        else if cmp < 0 then
+          balance (create (insert_aux key value left) k v right)
+        else balance (create left k v (insert_aux key value right))
 
-  let find_opt key tree =
-    let rec aux = function
-      | Empty -> None
-      | Node { key = k; value; left; right; _ } ->
-          let cmp = Ord.compare key k in
-          if cmp = 0 then Some value
-          else if cmp < 0 then aux left
-          else aux right
-    in
-    aux tree
+  let insert key value (Ex tree) = Ex (insert_aux key value tree)
 
+  let rec find_opt_aux : type a e. key -> (a, e) tree -> a option =
+   fun key -> function
+    | Empty -> None
+    | Node { key = k; value; left; right; _ } ->
+        let cmp = Ord.compare key k in
+        if cmp = 0 then Some value
+        else if cmp < 0 then find_opt_aux key left
+        else find_opt_aux key right
+
+  let find_opt key (Ex tree) = find_opt_aux key tree
   let mem key tree = Option.is_some (find_opt key tree)
 
-  let rec remove_min = function
-    | Empty -> invalid_arg "remove_min"
-    | Node { key; value; left = Empty; right; _ } -> (right, key, value)
-    | Node { key; value; left; right; _ } ->
-        let left', min_key, min_value = remove_min left in
-        (balance (create left' key value right), min_key, min_value)
+  type ('a, 'e) remove_min_result =
+    | MinEmpty : ('a, empty) remove_min_result
+    | MinNode : ('a, 'e) tree * key * 'a -> ('a, nonempty) remove_min_result
 
-  let rec remove key = function
-    | Empty -> Empty
+  let rec remove_min : type a e. (a, e) tree -> (a, e) remove_min_result =
+    function
+    | Empty -> MinEmpty
+    | Node { key; value; left = Empty; right; _ } -> MinNode (right, key, value)
+    | Node { key; value; left; right; _ } -> (
+        match remove_min left with
+        | MinEmpty -> MinNode (right, key, value)
+        | MinNode (left', min_key, min_value) ->
+            MinNode (balance (create left' key value right), min_key, min_value)
+        )
+
+  type ('a, 'e) remove_result =
+    | RemoveEx : ('a, _) tree -> ('a, 'e) remove_result
+
+  let rec remove_aux : type a e. key -> (a, e) tree -> (a, e) remove_result =
+   fun key -> function
+    | Empty -> RemoveEx Empty
     | Node { key = k; value = v; left; right; _ } ->
         let cmp = Ord.compare key k in
         if cmp = 0 then
           match (left, right) with
-          | Empty, _ -> right
-          | _, Empty -> left
-          | _ ->
-              let right', min_key, min_value = remove_min right in
-              balance (create left min_key min_value right')
-        else if cmp < 0 then balance (create (remove key left) k v right)
-        else balance (create left k v (remove key right))
+          | Empty, r -> RemoveEx r
+          | l, Empty -> RemoveEx l
+          | _ -> (
+              match remove_min right with
+              | MinEmpty -> RemoveEx left
+              | MinNode (right', min_key, min_value) ->
+                  RemoveEx (balance (create left min_key min_value right')))
+        else if cmp < 0 then
+          let (RemoveEx left') = remove_aux key left in
+          RemoveEx (balance (create left' k v right))
+        else
+          let (RemoveEx right') = remove_aux key right in
+          RemoveEx (balance (create left k v right'))
 
-  let update key f tree =
-    match f (find_opt key tree) with
-    | None -> remove key tree
-    | Some value -> insert key value tree
+  let remove key (Ex tree) =
+    let (RemoveEx tree') = remove_aux key tree in
+    Ex tree'
 
-  let rec cardinal = function
+  let update key f (Ex tree) =
+    match f (find_opt_aux key tree) with
+    | None ->
+        let (RemoveEx tree') = remove_aux key tree in
+        Ex tree'
+    | Some value -> Ex (insert_aux key value tree)
+
+  let rec cardinal_aux : type a e. (a, e) tree -> int = function
     | Empty -> 0
-    | Node { left; right; _ } -> 1 + cardinal left + cardinal right
+    | Node { left; right; _ } -> 1 + cardinal_aux left + cardinal_aux right
 
-  let rec minimum_opt = function
+  let cardinal (Ex tree) = cardinal_aux tree
+
+  let rec minimum_opt_aux : type a e. (a, e) tree -> (key * a) option = function
     | Empty -> None
     | Node { key; value; left = Empty; _ } -> Some (key, value)
-    | Node { left; _ } -> minimum_opt left
+    | Node { left; _ } -> minimum_opt_aux left
 
-  let rec maximum_opt = function
+  let minimum (Ex tree) = minimum_opt_aux tree
+
+  let rec maximum_opt_aux : type a e. (a, e) tree -> (key * a) option = function
     | Empty -> None
     | Node { key; value; right = Empty; _ } -> Some (key, value)
-    | Node { right; _ } -> maximum_opt right
+    | Node { right; _ } -> maximum_opt_aux right
 
-  let rec fold_left f acc = function
+  let maximum (Ex tree) = maximum_opt_aux tree
+
+  let rec fold_left_aux : type a e b.
+      (b -> key -> a -> b) -> b -> (a, e) tree -> b =
+   fun f acc -> function
     | Empty -> acc
     | Node { left; key; value; right; _ } ->
-        let acc = fold_left f acc left in
+        let acc = fold_left_aux f acc left in
         let acc = f acc key value in
-        fold_left f acc right
+        fold_left_aux f acc right
 
-  let rec fold_right f tree acc =
+  let fold_left f acc (Ex tree) = fold_left_aux f acc tree
+
+  let rec fold_right_aux : type a e b.
+      (key -> a -> b -> b) -> (a, e) tree -> b -> b =
+   fun f tree acc ->
     match tree with
     | Empty -> acc
     | Node { left; key; value; right; _ } ->
-        fold_right f left (f key value (fold_right f right acc))
+        fold_right_aux f left (f key value (fold_right_aux f right acc))
+
+  let fold_right f (Ex tree) acc = fold_right_aux f tree acc
 
   let map fn tree =
     fold_left (fun acc key value -> insert key (fn value) acc) empty tree
@@ -197,21 +248,24 @@ module Make (Ord : OrderedType) : S with type key = Ord.t = struct
   let of_list entries =
     List.fold_left (fun acc (key, value) -> insert key value acc) empty entries
 
-  let minimum = minimum_opt
-  let maximum = maximum_opt
+  type 'a stack_item = StackEx : ('a, _) tree -> 'a stack_item
 
-  let rec push_left stack = function
+  let rec push_left : type a e.
+      a stack_item list -> (a, e) tree -> a stack_item list =
+   fun stack tree ->
+    match tree with
     | Empty -> stack
-    | Node { left; _ } as node -> push_left (node :: stack) left
+    | Node { left; _ } -> push_left (StackEx tree :: stack) left
 
-  let rec next = function
+  let rec next : type a.
+      a stack_item list -> (key * a * a stack_item list) option = function
     | [] -> None
-    | Empty :: rest -> next rest
-    | Node { key; value; right; _ } :: rest ->
+    | StackEx Empty :: rest -> next rest
+    | StackEx (Node { key; value; right; _ }) :: rest ->
         let stack' = push_left rest right in
         Some (key, value, stack')
 
-  let equal value_equal a b =
+  let equal value_equal (Ex a) (Ex b) =
     let rec loop stack_a stack_b =
       match (next stack_a, next stack_b) with
       | None, None -> true

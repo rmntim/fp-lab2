@@ -42,10 +42,17 @@ let test_remove () =
   let dict = IntDict.remove 5 dict in
   check bool "second removal" false (IntDict.mem 5 dict);
   check dict_testable "expected remaining bindings"
-    (IntDict.of_list [ (6, 60); (7, 70) ]) dict;
-  check (option (pair int int)) "minimum updates" (Some (6, 60))
+    (IntDict.of_list [ (6, 60); (7, 70) ])
+    dict;
+  check
+    (option (pair int int))
+    "minimum updates"
+    (Some (6, 60))
     (IntDict.minimum dict);
-  check (option (pair int int)) "maximum updates" (Some (7, 70))
+  check
+    (option (pair int int))
+    "maximum updates"
+    (Some (7, 70))
     (IntDict.maximum dict)
 
 let test_map_and_filter () =
@@ -61,7 +68,8 @@ let test_map_and_filter () =
   check bool "filters even key" false (IntDict.mem 2 filtered);
   check int "cardinal after filter" 2 (IntDict.cardinal filtered);
   check dict_testable "filtered dictionary"
-    (IntDict.of_list [ (1, 2); (3, 6) ]) filtered
+    (IntDict.of_list [ (1, 2); (3, 6) ])
+    filtered
 
 let test_fold_functions () =
   let open Alcotest in
@@ -83,13 +91,15 @@ let dict_of_bindings bindings = IntDict.of_list bindings
 
 let property_append_left_identity =
   let open QCheck in
-  Test.make ~name:"append left identity" ~count:200 bindings_arbitrary (fun bs ->
+  Test.make ~name:"append left identity" ~count:200 bindings_arbitrary
+    (fun bs ->
       let dict = dict_of_bindings bs in
       IntDict.equal ( = ) dict (IntDict.append IntDict.empty dict))
 
 let property_append_right_identity =
   let open QCheck in
-  Test.make ~name:"append right identity" ~count:200 bindings_arbitrary (fun bs ->
+  Test.make ~name:"append right identity" ~count:200 bindings_arbitrary
+    (fun bs ->
       let dict = dict_of_bindings bs in
       IntDict.equal ( = ) dict (IntDict.append dict IntDict.empty))
 
@@ -135,7 +145,4 @@ let unit_tests =
 
 let () =
   Alcotest.run "Labwork2 Dict"
-    [
-      ("unit", unit_tests);
-      ("properties", property_tests);
-    ]
+    [ ("unit", unit_tests); ("properties", property_tests) ]
